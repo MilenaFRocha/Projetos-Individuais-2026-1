@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ConstruData — Análise de PDFs de Construtoras</title>
+  <style>
+    /* ── Design Tokens ── */
+    :root {
+      --bg:          #0f1117;
+      --surface:     #1a1d27;
+      --surface-2:   #222536;
+      --border:      #2e3347;
+      --accent:      #f59e0b;
+      --accent-soft: rgba(245,158,11,0.12);
+      --accent-2:    #3b82f6;
+      --green:       #10b981;
+      --red:         #ef4444;
+      --text:        #e8eaf0;
+      --muted:       #8890a8;
+      --radius:      10px;
+      --font-mono:   "JetBrains Mono", "Fira Code", monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Inter", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Layout ── */
+    .header {
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      height: 60px;
+      background: var(--surface);
+    }
+    .header-logo {
+      font-weight: 800;
+      font-size: 1.1rem;
+      letter-spacing: -0.02em;
+    }
+    .header-logo span { color: var(--accent); }
+    .header-tag {
+      font-size: 0.7rem;
+      background: var(--accent-soft);
+      color: var(--accent);
+      padding: 2px 8px;
+      border-radius: 20px;
+      border: 1px solid rgba(245,158,11,0.3);
+      font-weight: 600;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      height: calc(100vh - 60px);
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      border-right: 1px solid var(--border);
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sidebar-section {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    /* Upload zone */
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 24px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: transparent;
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+    .upload-zone input { display: none; }
+    .upload-icon { font-size: 2rem; margin-bottom: 8px; }
+    .upload-text { font-size: 0.8rem; color: var(--muted); line-height: 1.5; }
+    .upload-text strong { color: var(--text); }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #000;
+      width: 100%;
+      justify-content: center;
+      margin-top: 12px;
+    }
+    .btn-primary:hover { background: #f6a924; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-ghost {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 5px 10px;
+      font-size: 0.75rem;
+    }
+    .btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+
+    /* PDF list */
+    .pdf-list { overflow-y: auto; flex: 1; }
+    .pdf-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 20px;
+      cursor: pointer;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      transition: background 0.15s;
+    }
+    .pdf-item:hover { background: var(--surface-2); }
+    .pdf-item.active { background: var(--accent-soft); border-left: 3px solid var(--accent); }
+    .pdf-icon { font-size: 1.3rem; flex-shrink: 0; }
+    .pdf-name { font-size: 0.78rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pdf-meta { font-size: 0.68rem; color: var(--muted); margin-top: 2px; }
+    .pdf-badge {
+      margin-left: auto;
+      font-size: 0.6rem;
+      padding: 2px 7px;
+      border-radius: 20px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .badge-done  { background: rgba(16,185,129,0.15); color: var(--green); border: 1px solid rgba(16,185,129,0.3); }
+    .badge-ready { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+
+    /* Token meter */
+    .token-panel {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .token-label { font-size: 0.68rem; color: var(--muted); margin-bottom: 8px; display: flex; justify-content: space-between; }
+    .token-bar-bg { height: 4px; background: var(--border); border-radius: 4px; overflow: hidden; }
+    .token-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent-2), var(--accent)); border-radius: 4px; transition: width 0.5s; }
+    .token-stats { display: flex; gap: 12px; margin-top: 10px; }
+    .token-stat { flex: 1; }
+    .token-stat-val { font-size: 0.88rem; font-weight: 700; font-family: var(--font-mono); }
+    .token-stat-key { font-size: 0.62rem; color: var(--muted); margin-top: 1px; }
+
+    /* ── Main content ── */
+    .main { overflow-y: auto; padding: 32px; }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--muted);
+      text-align: center;
+      gap: 12px;
+    }
+    .empty-state-icon { font-size: 3.5rem; opacity: 0.4; }
+    .empty-state h2 { font-size: 1rem; color: var(--text); opacity: 0.6; }
+
+    /* Result cards */
+    .result-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 28px;
+      gap: 16px;
+    }
+    .result-title h1 { font-size: 1.3rem; font-weight: 800; margin-bottom: 4px; }
+    .result-title p { font-size: 0.78rem; color: var(--muted); }
+    .confidence-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 14px;
+    }
+    .confidence-val { font-size: 1.2rem; font-weight: 800; font-family: var(--font-mono); color: var(--green); }
+    .confidence-lbl { font-size: 0.65rem; color: var(--muted); }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-bottom: 16px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 16px; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+    }
+    .card-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .kpi { }
+    .kpi-val { font-size: 1.5rem; font-weight: 800; font-family: var(--font-mono); color: var(--accent); }
+    .kpi-label { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+
+    .field-list { display: flex; flex-direction: column; gap: 8px; }
+    .field-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .field-key { font-size: 0.75rem; color: var(--muted); }
+    .field-val { font-size: 0.8rem; font-weight: 600; text-align: right; max-width: 55%; word-break: break-word; }
+    .field-val.null { color: var(--border); font-style: italic; font-weight: 400; font-size: 0.72rem; }
+
+    .empreendimentos-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+    .empreendimentos-table th {
+      text-align: left;
+      font-size: 0.66rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--muted);
+      border-bottom: 1px solid var(--border);
+      padding: 6px 10px;
+    }
+    .empreendimentos-table td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .empreendimentos-table tr:hover td { background: var(--surface-2); }
+    .phase-tag {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 12px;
+    }
+    .phase-lancamento { background: rgba(59,130,246,0.15); color: var(--accent-2); }
+    .phase-obras      { background: rgba(245,158,11,0.15); color: var(--accent); }
+    .phase-entregue   { background: rgba(16,185,129,0.15); color: var(--green); }
+
+    /* Progress bar inline */
+    .progress-wrap { display: flex; align-items: center; gap: 8px; }
+    .progress-bar  { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--accent); border-radius: 3px; }
+
+    .missing-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .missing-tag {
+      font-size: 0.68rem;
+      background: rgba(239,68,68,0.1);
+      color: var(--red);
+      border: 1px solid rgba(239,68,68,0.25);
+      padding: 2px 8px;
+      border-radius: 20px;
+    }
+
+    /* Loading overlay */
+    .loading-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15,17,23,0.85);
+      backdrop-filter: blur(4px);
+      z-index: 100;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+    }
+    .loading-overlay.show { display: flex; }
+    .spinner {
+      width: 44px; height: 44px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { font-size: 0.9rem; color: var(--text); }
+    .loading-sub  { font-size: 0.75rem; color: var(--muted); }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 18px;
+      font-size: 0.82rem;
+      z-index: 200;
+      display: none;
+      gap: 8px;
+      align-items: center;
+      max-width: 320px;
+    }
+    .toast.show { display: flex; }
+    .toast.success { border-color: rgba(16,185,129,0.4); }
+    .toast.error   { border-color: rgba(239,68,68,0.4); }
+
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { max-height: 300px; }
+      .grid-3, .grid-4 { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+  <div class="header-logo">Constru<span>Data</span></div>
+  <div class="header-tag">MinIO + Claude AI</div>
+  <div style="margin-left:auto; display:flex; gap:10px; align-items:center;">
+    <button class="btn btn-ghost" onclick="loadPdfList()">↻ Atualizar</button>
+    <a href="http://localhost:9001" target="_blank" class="btn btn-ghost">MinIO Console ↗</a>
+  </div>
+</header>
+
+<!-- Layout -->
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <!-- Upload -->
+    <div class="sidebar-section">
+      <div class="sidebar-title">Upload de PDF</div>
+      <label class="upload-zone" id="uploadZone">
+        <input type="file" id="fileInput" accept=".pdf" onchange="onFileSelect(event)" />
+        <div class="upload-icon">📄</div>
+        <div class="upload-text">
+          <strong>Clique ou arraste um PDF</strong><br>
+          Relatórios, releases, apresentações<br>de construtoras
+        </div>
+      </label>
+      <div id="selectedFile" style="font-size:0.75rem; color:var(--muted); margin-top:8px; text-align:center;"></div>
+      <button class="btn btn-primary" id="uploadBtn" onclick="uploadAndAnalyze()" disabled>
+        ⚡ Enviar e Analisar com IA
+      </button>
+    </div>
+
+    <!-- PDF list -->
+    <div class="sidebar-section" style="padding-bottom:0; flex:1; overflow:hidden; display:flex; flex-direction:column;">
+      <div class="sidebar-title" style="padding-bottom:14px;">PDFs no MinIO</div>
+      <div class="pdf-list" id="pdfList">
+        <div style="padding:20px; text-align:center; font-size:0.78rem; color:var(--muted);">
+          Nenhum PDF ainda
+        </div>
+      </div>
+    </div>
+
+    <!-- Token meter -->
+    <div class="token-panel" id="tokenPanel" style="display:none;">
+      <div class="token-label">
+        <span>Tokens usados (sessão)</span>
+        <span id="tokenPct">0%</span>
+      </div>
+      <div class="token-bar-bg">
+        <div class="token-bar-fill" id="tokenBar" style="width:0%"></div>
+      </div>
+      <div class="token-stats">
+        <div class="token-stat">
+          <div class="token-stat-val" id="tokIn">0</div>
+          <div class="token-stat-key">Entrada</div>
+        </div>
+        <div class="token-stat">
+          <div class="token-stat-val" id="tokOut">0</div>
+          <div class="token-stat-key">Saída</div>
+        </div>
+        <div class="token-stat">
+          <div class="token-stat-val" id="tokCost">$0.000</div>
+          <div class="token-stat-key">Custo est.</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main" id="mainContent">
+    <div class="empty-state">
+      <div class="empty-state-icon">🏗️</div>
+      <h2>Selecione ou envie um PDF para começar</h2>
+      <p style="font-size:0.78rem; max-width:340px; line-height:1.6;">
+        ConstruData extrai automaticamente dados financeiros,
+        operacionais e de empreendimentos de relatórios de construtoras.
+      </p>
+    </div>
+  </main>
+</div>
+
+<!-- Loading overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loadingText">Processando PDF…</div>
+  <div class="loading-sub"  id="loadingSub">Isso pode levar alguns segundos</div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+  // ── Config ──────────────────────────────────────
+  const API = 'http://localhost:8000';
+  let selectedFile = null;
+  let sessionTokens = { input: 0, output: 0, cost: 0 };
+  const TOKEN_MAX = 200000; // limite visual da barra
+
+  // ── Upload zone drag/drop ────────────────────────
+  const zone = document.getElementById('uploadZone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    const f = e.dataTransfer.files[0];
+    if (f?.name.endsWith('.pdf')) setFile(f);
+  });
+
+  function onFileSelect(e) { setFile(e.target.files[0]); }
+
+  function setFile(f) {
+    selectedFile = f;
+    document.getElementById('selectedFile').textContent = `📎 ${f.name} (${(f.size/1024).toFixed(1)} KB)`;
+    document.getElementById('uploadBtn').disabled = false;
+  }
+
+  // ── Upload + Analyze ──────────────────────────────
+  async function uploadAndAnalyze() {
+    if (!selectedFile) return;
+    showLoading('Enviando PDF para MinIO…', 'Fazendo upload…');
+
+    const form = new FormData();
+    form.append('file', selectedFile);
+
+    try {
+      updateLoading('Analisando com Claude AI…', 'Extraindo dados estruturados');
+      const res  = await fetch(`${API}/upload-and-analyze`, { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Erro desconhecido');
+
+      updateTokens(data.token_usage);
+      renderResult(data);
+      loadPdfList();
+      showToast('✅ Análise concluída!', 'success');
+
+      selectedFile = null;
+      document.getElementById('fileInput').value = '';
+      document.getElementById('selectedFile').textContent = '';
+      document.getElementById('uploadBtn').disabled = true;
+    } catch(e) {
+      showToast(`❌ ${e.message}`, 'error');
+    } finally {
+      hideLoading();
+    }
+  }
+
+  // ── Load PDF list ─────────────────────────────────
+  async function loadPdfList() {
+    try {
+      const res  = await fetch(`${API}/pdfs`);
+      const data = await res.json();
+      const list = document.getElementById('pdfList');
+
+      if (!data.pdfs?.length) {
+        list.innerHTML = '<div style="padding:20px; text-align:center; font-size:0.78rem; color:var(--muted);">Nenhum PDF ainda</div>';
+        return;
+      }
+
+      // Check which have results
+      const resData = await fetch(`${API}/results`).then(r => r.json()).catch(() => ({ results: [] }));
+      const doneSet = new Set(resData.results.map(r => r.filename.replace('_resultado.json', '.pdf')));
+
+      list.innerHTML = data.pdfs.map(pdf => `
+        <div class="pdf-item" onclick="loadResult('${pdf.filename}', ${doneSet.has(pdf.filename)})">
+          <div class="pdf-icon">📄</div>
+          <div style="overflow:hidden;">
+            <div class="pdf-name">${pdf.filename}</div>
+            <div class="pdf-meta">${pdf.size_kb} KB · ${pdf.last_modified ? new Date(pdf.last_modified).toLocaleDateString('pt-BR') : ''}</div>
+          </div>
+          <span class="pdf-badge ${doneSet.has(pdf.filename) ? 'badge-done' : 'badge-ready'}">
+            ${doneSet.has(pdf.filename) ? '✓ Analisado' : 'Pendente'}
+          </span>
+        </div>
+      `).join('');
+    } catch(e) {
+      console.error('Erro ao listar PDFs:', e);
+    }
+  }
+
+  async function loadResult(filename, hasResult) {
+    // Mark active
+    document.querySelectorAll('.pdf-item').forEach(el => el.classList.remove('active'));
+    event.currentTarget.classList.add('active');
+
+    if (!hasResult) {
+      // Analyze now
+      showLoading('Analisando com Claude AI…', `Processando ${filename}`);
+      try {
+        const res  = await fetch(`${API}/analyze/${encodeURIComponent(filename)}`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Erro');
+        updateTokens(data.token_usage);
+        renderResult(data);
+        loadPdfList();
+      } catch(e) {
+        showToast(`❌ ${e.message}`, 'error');
+      } finally {
+        hideLoading();
+      }
+      return;
+    }
+
+    // Load existing result
+    try {
+      const resName = filename.replace('.pdf', '_resultado.json');
+      const res  = await fetch(`${API}/results/${encodeURIComponent(resName)}`);
+      const data = await res.json();
+      renderResult(data);
+    } catch(e) {
+      showToast(`❌ Erro ao carregar resultado: ${e.message}`, 'error');
+    }
+  }
+
+  // ── Render result ────────────────────────────────
+  function renderResult(data) {
+    const d = data.dados || {};
+    const emp   = d.empresa      || {};
+    const fin   = d.financeiro   || {};
+    const op    = d.operacional  || {};
+    const idx   = d.indices      || {};
+    const meta  = d.metadata     || {};
+    const emps  = d.empreendimentos || [];
+    const em    = data.extraction_meta || {};
+    const tu    = data.token_usage || {};
+
+    const fmt  = (v, prefix='R$ ', suffix='') => v != null ? `${prefix}${formatNum(v)}${suffix}` : null;
+    const fmtP = v => v != null ? `${v.toFixed(1)}%` : null;
+    const row  = (k, v, suf='') => {
+      const display = v != null ? `<span class="field-val">${v}${suf}</span>` : `<span class="field-val null">—</span>`;
+      return `<div class="field-row"><span class="field-key">${k}</span>${display}</div>`;
+    };
+
+    const confidence = meta.confianca_extracao ?? 0;
+    const confColor  = confidence > 0.7 ? 'var(--green)' : confidence > 0.4 ? 'var(--accent)' : 'var(--red)';
+
+    document.getElementById('mainContent').innerHTML = `
+      <!-- Header -->
+      <div class="result-header">
+        <div class="result-title">
+          <h1>${emp.nome || data.filename || 'Construtora'}</h1>
+          <p>
+            ${meta.tipo_documento || 'Documento'} ·
+            ${fin.periodo_referencia || '—'} ·
+            ${em.total_pages || '?'} páginas analisadas ·
+            ${emps.length} empreendimento(s)
+          </p>
+        </div>
+        <div class="confidence-badge">
+          <div>
+            <div class="confidence-val" style="color:${confColor}">${(confidence*100).toFixed(0)}%</div>
+            <div class="confidence-lbl">Confiança</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPIs financeiros -->
+      <div class="grid-4">
+        ${kpiCard('💰', 'Receita Bruta', fmt(fin.receita_bruta))}
+        ${kpiCard('📈', 'EBITDA', fmt(fin.ebitda))}
+        ${kpiCard('💵', 'Lucro Líquido', fmt(fin.lucro_liquido))}
+        ${kpiCard('🏦', 'Dívida Líquida', fmt(fin.divida_liquida))}
+      </div>
+
+      <!-- Operacional KPIs -->
+      <div class="grid-4">
+        ${kpiCard('🏘️', 'Unid. Lançadas', op.unidades_lancadas, '')}
+        ${kpiCard('🤝', 'Unid. Vendidas', op.unidades_vendidas, '')}
+        ${kpiCard('🔥', 'VSO', fmtP(op.vso_percentual), '')}
+        ${kpiCard('📦', 'VGV Lançado', fmt(op.vgv_lancado))}
+      </div>
+
+      <!-- Detalhes -->
+      <div class="grid-2">
+        <!-- Empresa -->
+        <div class="card">
+          <div class="card-title">🏢 Dados da Empresa</div>
+          <div class="field-list">
+            ${row('CNPJ', emp.cnpj)}
+            ${row('Endereço', emp.endereco)}
+            ${row('Telefone', emp.telefone)}
+            ${row('Fundação', emp.ano_fundacao)}
+            ${row('Site', emp.site)}
+            ${row('Estados', op.estados_atuacao?.join(', ') || null)}
+            ${row('Empreend. Ativos', op.num_empreendimentos_ativos)}
+          </div>
+        </div>
+
+        <!-- Índices -->
+        <div class="card">
+          <div class="card-title">📊 Índices Financeiros</div>
+          <div class="field-list">
+            ${row('ROE', fmtP(idx.roe_percentual))}
+            ${row('Margem Bruta', fmtP(idx.margem_bruta_percentual))}
+            ${row('Margem Líquida', fmtP(idx.margem_liquida_percentual))}
+            ${row('Alavancagem', fmtP(idx.alavancagem_percentual))}
+          </div>
+          ${idx.margem_bruta_percentual != null ? `
+            <div style="margin-top:16px;">
+              <div class="field-key" style="margin-bottom:6px;">Margem Bruta</div>
+              <div class="progress-wrap">
+                <div class="progress-bar"><div class="progress-fill" style="width:${Math.min(idx.margem_bruta_percentual,100)}%"></div></div>
+                <span style="font-size:0.75rem; font-weight:700; color:var(--accent);">${idx.margem_bruta_percentual.toFixed(1)}%</span>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+
+      <!-- Empreendimentos -->
+      ${emps.length > 0 ? `
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-title">🏗️ Empreendimentos (${emps.length})</div>
+          <table class="empreendimentos-table">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Localização</th>
+                <th>Segmento</th>
+                <th>Fase</th>
+                <th>Unidades</th>
+                <th>VGV Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${emps.map(e => `
+                <tr>
+                  <td style="font-weight:600;">${e.nome || '—'}</td>
+                  <td>${[e.cidade, e.estado].filter(Boolean).join(' / ') || '—'}</td>
+                  <td>${e.segmento || '—'}</td>
+                  <td>${phaseTag(e.fase)}</td>
+                  <td style="font-family:var(--font-mono);">${e.unidades_total ?? '—'}</td>
+                  <td style="font-family:var(--font-mono);">${e.vgv_total ? 'R$ ' + formatNum(e.vgv_total) : '—'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` : ''}
+
+      <!-- Meta + tokens -->
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">ℹ️ Extração</div>
+          <div class="field-list">
+            ${row('Páginas totais', em.total_pages)}
+            ${row('Páginas analisadas', em.pages_processed)}
+            ${row('Tabelas detectadas', em.tables_found)}
+            ${row('Analisado em', em.analyzed_at ? new Date(em.analyzed_at).toLocaleString('pt-BR') : null)}
+          </div>
+          ${meta.campos_nao_encontrados?.length ? `
+            <div style="margin-top:14px;">
+              <div class="field-key" style="margin-bottom:8px;">Campos não encontrados</div>
+              <div class="missing-tags">
+                ${meta.campos_nao_encontrados.map(c => `<span class="missing-tag">${c}</span>`).join('')}
+              </div>
+            </div>
+          ` : ''}
+          ${meta.observacoes ? `<div style="margin-top:12px; font-size:0.75rem; color:var(--muted); line-height:1.5;">${meta.observacoes}</div>` : ''}
+        </div>
+
+        <div class="card">
+          <div class="card-title">⚡ Tokens desta análise</div>
+          ${tu.total_tokens ? `
+            <div class="field-list">
+              ${row('Modelo', tu.model)}
+              ${row('Tokens de entrada', tu.input_tokens?.toLocaleString('pt-BR'))}
+              ${row('Tokens de saída', tu.output_tokens?.toLocaleString('pt-BR'))}
+              ${row('Total', tu.total_tokens?.toLocaleString('pt-BR'))}
+              ${row('Custo estimado', tu.custo_usd_estimado != null ? `US$ ${tu.custo_usd_estimado.toFixed(4)}` : null)}
+            </div>
+          ` : '<div style="font-size:0.78rem; color:var(--muted);">Dados de tokens não disponíveis</div>'}
+        </div>
+      </div>
+    `;
+  }
+
+  function kpiCard(icon, label, value, raw) {
+    const display = value ?? '<span style="color:var(--muted);font-size:1rem;">—</span>';
+    return `
+      <div class="card kpi">
+        <div class="card-title">${icon} ${label}</div>
+        <div class="kpi-val">${display}</div>
+      </div>
+    `;
+  }
+
+  function phaseTag(fase) {
+    if (!fase) return '—';
+    const cls = fase.toLowerCase().includes('lanç') ? 'phase-lancamento'
+              : fase.toLowerCase().includes('obr')  ? 'phase-obras'
+              : fase.toLowerCase().includes('entr') ? 'phase-entregue'
+              : '';
+    return `<span class="phase-tag ${cls}">${fase}</span>`;
+  }
+
+  function formatNum(n) {
+    if (n == null) return '—';
+    if (n >= 1e9) return (n/1e9).toFixed(2) + ' B';
+    if (n >= 1e6) return (n/1e6).toFixed(2) + ' M';
+    if (n >= 1e3) return (n/1e3).toFixed(1) + ' K';
+    return n.toLocaleString('pt-BR');
+  }
+
+  // ── Token tracker ────────────────────────────────
+  function updateTokens(tu) {
+    if (!tu) return;
+    sessionTokens.input  += tu.input_tokens  || 0;
+    sessionTokens.output += tu.output_tokens || 0;
+    sessionTokens.cost   += tu.custo_usd_estimado || 0;
+
+    const total = sessionTokens.input + sessionTokens.output;
+    const pct   = Math.min((total / TOKEN_MAX) * 100, 100).toFixed(1);
+
+    document.getElementById('tokenPanel').style.display = 'block';
+    document.getElementById('tokenPct').textContent     = `${pct}%`;
+    document.getElementById('tokenBar').style.width     = `${pct}%`;
+    document.getElementById('tokIn').textContent        = sessionTokens.input.toLocaleString('pt-BR');
+    document.getElementById('tokOut').textContent       = sessionTokens.output.toLocaleString('pt-BR');
+    document.getElementById('tokCost').textContent      = `$${sessionTokens.cost.toFixed(4)}`;
+  }
+
+  // ── UI helpers ───────────────────────────────────
+  function showLoading(text, sub) {
+    document.getElementById('loadingText').textContent = text;
+    document.getElementById('loadingSub').textContent  = sub;
+    document.getElementById('loadingOverlay').classList.add('show');
+  }
+  function updateLoading(text, sub) {
+    document.getElementById('loadingText').textContent = text;
+    document.getElementById('loadingSub').textContent  = sub;
+  }
+  function hideLoading() { document.getElementById('loadingOverlay').classList.remove('show'); }
+
+  let toastTimer;
+  function showToast(msg, type='') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className   = `toast show ${type}`;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 4000);
+  }
+
+  // ── Init ─────────────────────────────────────────
+  loadPdfList();
+</script>
+</body>
+</html>
