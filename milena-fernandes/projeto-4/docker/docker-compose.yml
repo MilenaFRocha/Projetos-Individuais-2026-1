@@ -1,0 +1,43 @@
+version: "3.9"
+
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: construdata_minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    ports:
+      - "9000:9000"   # API S3
+      - "9001:9001"   # Console Web
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: construdata_api
+    ports:
+      - "8000:8000"
+    environment:
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin123
+      MINIO_BUCKET: construtoras-pdfs
+    env_file:
+      - .env # tem que ir pro .env para carregar de la (lembra mulher)
+    depends_on:
+      minio:
+        condition: service_healthy
+    volumes:
+      - ../backend:/app
+
+volumes:
+  minio_data:

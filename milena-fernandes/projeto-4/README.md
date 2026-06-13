@@ -1,6 +1,6 @@
-# 🏗️ ConstruData
+# Projeto Extra
 
-Extração inteligente de dados estruturados de PDFs de construtoras usando **MinIO + Claude AI**.
+Extração inteligente de dados estruturados de PDFs de construtoras usando **MinIO + Gemini**.
 
 ---
 
@@ -16,8 +16,8 @@ Extração inteligente de dados estruturados de PDFs de construtoras usando **Mi
                                      │
                                      ▼
                             ┌────────────────┐
-                            │  Claude API    │
-                            │ (claude-sonnet)│
+                            │  Gemini        │
+                            │ (gemini-flash) │
                             └────────────────┘
 ```
 
@@ -28,7 +28,7 @@ Extração inteligente de dados estruturados de PDFs de construtoras usando **Mi
 | Storage de PDFs | MinIO (S3-compatível) |
 | Backend API | FastAPI + Uvicorn |
 | Extração de texto | pdfplumber, pypdf, poppler |
-| IA | Claude Sonnet 4.6 (Anthropic) |
+| IA | Gemini 2.5 Flash |
 | Frontend | HTML/JS puro (sem dependências) |
 
 ---
@@ -39,7 +39,7 @@ Extração inteligente de dados estruturados de PDFs de construtoras usando **Mi
 
 - Docker e Docker Compose
 - Python 3.11+
-- Chave da API Anthropic
+- Chave da API 
 
 ### 2. Configuração
 
@@ -70,8 +70,6 @@ Serviços disponíveis:
 ```bash
 cd backend
 pip install -r requirements.txt
-# Certifique-se que o MinIO está rodando via Docker
-ANTHROPIC_API_KEY=sk-ant-... uvicorn main:app --reload
 ```
 
 ---
@@ -162,7 +160,7 @@ construdata/
 │   ├── main.py           # FastAPI app + endpoints
 │   ├── minio_client.py   # Upload/download MinIO
 │   ├── pdf_extractor.py  # Extração de texto/tabelas
-│   ├── ai_analyzer.py    # Integração Claude API
+│   ├── ai_analyzer.py    # Integração Gemini API
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── frontend/

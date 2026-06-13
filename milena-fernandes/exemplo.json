@@ -1,0 +1,158 @@
+{
+   "empresa": {
+     "nome": "Construtora Tenda S.A.",
+     "cnpj": null,
+     "ticker": "TEND3",
+     "segmento": "habitação popular",
+     "site_ri": null
+   },
+   "periodo": {
+     "trimestre_atual": "3T24",
+     "trimestre_anterior": "2T24",
+     "mesmo_trimestre_ano_anterior": "3T23",
+     "acumulado_atual": "9M24",
+     "acumulado_ano_anterior": "9M23"
+   },
+   "financeiro": {
+     "receita_liquida": {
+       "atual": 912.1,
+       "trimestre_anterior": 776.9,
+       "var_trimestre_pct": 12.8,
+       "mesmo_trim_ano_ant": 786.3,
+       "var_anual_pct": 13.7,
+       "acumulado_atual": null,
+       "acumulado_ano_ant": null,
+       "var_acumulado_pct": null
+     },
+     "lucro_bruto_ajustado": {
+       "atual": 293.6,
+       "trimestre_anterior": 228.8,
+       "var_trimestre_pct": 28.3,
+       "mesmo_trim_ano_ant": 189.4,
+       "var_anual_pct": 55.6,
+       "acumulado_atual": null,
+       "acumulado_ano_ant": null,
+       "var_acumulado_pct": null
+     },
+     "margem_bruta_ajustada_pct": {
+       "atual": 32.2,
+       "trimestre_anterior": 29.5,
+       "var_trimestre_pp": 2.7,
+       "mesmo_trim_ano_ant": 24.1,
+       "var_anual_pp": 8.1
+     },
+     "ebitda_ajustado": {
+       "atual": 150.8,
+       "trimestre_anterior": 98.1,
+       "var_trimestre_pct": 53.7,
+       "mesmo_trim_ano_ant": 56.4,
+       "var_anual_pct": 167.4
+     },
+     "margem_ebitda_ajustada_pct": {
+       "atual": 16.5,
+       "trimestre_anterior": 12.6,
+       "var_trimestre_pp": 3.9,
+       "mesmo_trim_ano_ant": 7.2,
+       "var_anual_pp": 9.3
+     },
+     "lucro_liquido": {
+       "atual": 76.2,
+       "trimestre_anterior": 4.5,
+       "var_trimestre_pct": 1593.3,
+       "mesmo_trim_ano_ant": -23.7,
+       "var_anual_pct": -421.1,
+       "acumulado_atual": null,
+       "acumulado_ano_ant": null
+     },
+     "margem_liquida_pct": {
+       "atual": 8.4,
+       "trimestre_anterior": 0.6,
+       "var_trimestre_pp": 7.8,
+       "mesmo_trim_ano_ant": -3.0,
+       "var_anual_pp": 11.4
+     },
+     "divida_liquida": 432.4,
+     "divida_liquida_pl_pct": null,
+     "divida_liquida_corporativa_pl_pct": 5.5,
+     "caixa_total": 738.0
+   },
+   "operacional": {
+     "lancamentos_vgv": {
+       "atual": 2150.1,
+       "trimestre_anterior": 940.0,
+       "var_trimestre_pct": 100.0,
+       "mesmo_trim_ano_ant": 748.0,
+       "var_anual_pct": 100.0,
+       "acumulado_atual": null,
+       "acumulado_ano_ant": null
+     },
+     "vendas_liquidas_vgv": {
+       "atual": 1554.6,
+       "trimestre_anterior": 1019.4,
+       "var_trimestre_pct": 52.6,
+       "mesmo_trim_ano_ant": 872.8,
+       "var_anual_pct": 78.1,
+       "acumulado_atual": null,
+       "acumulado_ano_ant": null
+     },
+     "vso_liquida_pct": {
+       "atual": 36.6,
+       "trimestre_anterior": 32.4,
+       "var_trimestre_pp": 4.2,
+       "mesmo_trim_ano_ant": 30.6,
+       "var_anual_pp": 6.0
+     },
+     "vgv_repassado": {
+       "atual": 864.5,
+       "trimestre_anterior": 807.4,
+       "var_trimestre_pct": 7.2,
+       "mesmo_trim_ano_ant": 694.9,
+       "var_anual_pct": 24.4
+     },
+     "unidades_entregues": {
+       "atual": 3950,
+       "trimestre_anterior": 2864,
+       "mesmo_trim_ano_ant": 4681
+     },
+     "banco_terrenos_vgv": 20598.7,
+     "preco_medio_por_unidade_mil": 214.2
+   },
+   "indices": {
+     "roe_pct": null,
+     "roce_pct": 26.4,
+     "margem_ref_pct": 38.3
+   },
+   "guidance": {
+     "vendas_liquidas_min": 4100.0,
+     "vendas_liquidas_max": 4400.0,
+     "margem_bruta_min_pct": 31.0,
+     "margem_bruta_max_pct": 32.0,
+     "ebitda_min": null,
+     "ebitda_max": null
+   },
+   "metadata": {
+     "tipo_documento": "Release de Resultados",
+     "confianca_extracao": 0.9,
+     "campos_nao_encontrados": [
+       "empresa.cnpj",
+       "empresa.site_ri",
+       "financeiro.receita_liquida.acumulado_atual",
+       "financeiro.receita_liquida.acumulado_ano_ant",
+       "financeiro.receita_liquida.var_acumulado_pct",
+       "financeiro.lucro_bruto_ajustado.acumulado_atual",
+       "financeiro.lucro_bruto_ajustado.acumulado_ano_ant",
+       "financeiro.lucro_bruto_ajustado.var_acumulado_pct",
+       "financeiro.lucro_liquido.acumulado_atual",
+       "financeiro.lucro_liquido.acumulado_ano_ant",
+       "financeiro.divida_liquida_pl_pct",
+       "operacional.lancamentos_vgv.acumulado_atual",
+       "operacional.lancamentos_vgv.acumulado_ano_ant",
+       "operacional.vendas_liquidas_vgv.acumulado_atual",
+       "operacional.vendas_liquidas_vgv.acumulado_ano_ant",
+       "indices.roe_pct",
+       "guidance.ebitda_min",
+       "guidance.ebitda_max"
+     ],
+     "observacoes": "Values for financial and operational metrics are consolidated unless specified otherwise. Some percentage changes and p.p. variations were calculated based on the provided absolute values. Ticker 'TEND3' and accumulated periods '9M24', '9M23' were inferred."
+   }
+ }

@@ -245,8 +245,8 @@
     .field-val { font-size: 0.8rem; font-weight: 600; text-align: right; max-width: 55%; word-break: break-word; }
     .field-val.null { color: var(--border); font-style: italic; font-weight: 400; font-size: 0.72rem; }
 
-    .empreendimentos-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
-    .empreendimentos-table th {
+    .data-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; margin-top: 10px; }
+    .data-table th {
       text-align: left;
       font-size: 0.66rem;
       font-weight: 700;
@@ -254,10 +254,22 @@
       letter-spacing: 0.07em;
       color: var(--muted);
       border-bottom: 1px solid var(--border);
-      padding: 6px 10px;
+      padding: 8px 10px;
+      white-space: nowrap;
     }
-    .empreendimentos-table td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.04); }
-    .empreendimentos-table tr:hover td { background: var(--surface-2); }
+    .data-table th:not(:first-child) { text-align: right; }
+    .data-table td { padding: 9px 10px; border-bottom: 1px solid rgba(255,255,255,0.04); font-family: var(--font-mono); font-size: 0.76rem; }
+    .data-table td:not(:first-child) { text-align: right; }
+    .data-table td:first-child { font-family: "Inter", system-ui, sans-serif; font-weight: 600; color: var(--text); }
+    .data-table tr:hover td { background: var(--surface-2); }
+    .data-table .row-label { font-family: "Inter", system-ui, sans-serif; font-weight: 600; color: var(--text); font-size: 0.76rem; }
+
+    .var-positive { color: var(--green); font-weight: 700; }
+    .var-negative { color: var(--red); font-weight: 700; }
+    .var-neutral  { color: var(--muted); }
+
+    .section-divider { margin: 28px 0 20px 0; border: none; border-top: 1px solid var(--border); }
+
     .phase-tag {
       font-size: 0.65rem;
       font-weight: 700;
@@ -282,6 +294,8 @@
       padding: 2px 8px;
       border-radius: 20px;
     }
+
+    .kpi-sub { font-size: 0.68rem; color: var(--muted); margin-top: 4px; font-family: var(--font-mono); }
 
     /* Loading overlay */
     .loading-overlay {
@@ -339,7 +353,7 @@
 <!-- Header -->
 <header class="header">
   <div class="header-logo">Constru<span>Data</span></div>
-  <div class="header-tag">MinIO + Claude AI</div>
+  <div class="header-tag">MinIO + Gemini AI</div>
   <div style="margin-left:auto; display:flex; gap:10px; align-items:center;">
     <button class="btn btn-ghost" onclick="loadPdfList()">↻ Atualizar</button>
     <a href="http://localhost:9001" target="_blank" class="btn btn-ghost">MinIO Console ↗</a>
@@ -462,7 +476,7 @@
     form.append('file', selectedFile);
 
     try {
-      updateLoading('Analisando com Claude AI…', 'Extraindo dados estruturados');
+      updateLoading('Analisando com Gemini AI…', 'Extraindo dados estruturados');
       const res  = await fetch(`${API}/upload-and-analyze`, { method: 'POST', body: form });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || 'Erro desconhecido');
@@ -523,7 +537,7 @@
 
     if (!hasResult) {
       // Analyze now
-      showLoading('Analisando com Claude AI…', `Processando ${filename}`);
+      showLoading('Analisando com Gemini AI…', `Processando ${filename}`);
       try {
         const res  = await fetch(`${API}/analyze/${encodeURIComponent(filename)}`, { method: 'POST' });
         const data = await res.json();
@@ -550,38 +564,132 @@
     }
   }
 
+  // ── Helpers de formatação ────────────────────────
+  function formatNum(n) {
+    if (n == null) return '—';
+    if (Math.abs(n) >= 1e9) return (n/1e9).toFixed(2) + ' B';
+    if (Math.abs(n) >= 1e6) return (n/1e6).toFixed(2) + ' M';
+    if (Math.abs(n) >= 1e3) return (n/1e3).toFixed(1) + ' K';
+    return n.toLocaleString('pt-BR');
+  }
+
+  function fmtMoney(v) { return v != null ? `R$ ${formatNum(v)}` : null; }
+  function fmtPct(v) { return v != null ? `${v.toFixed(1)}%` : null; }
+  function fmtPP(v) { return v != null ? `${v > 0 ? '+' : ''}${v.toFixed(1)} p.p.` : null; }
+
+  function varClass(v) {
+    if (v == null) return 'var-neutral';
+    return v >= 0 ? 'var-positive' : 'var-negative';
+  }
+
+  function fmtVar(v, suffix='%') {
+    if (v == null) return '<span class="var-neutral">—</span>';
+    const sign = v >= 0 ? '+' : '';
+    const cls = varClass(v);
+    return `<span class="${cls}">${sign}${v.toFixed(1)}${suffix}</span>`;
+  }
+
+  function cellVal(v, formatter) {
+    if (v == null) return '<span class="var-neutral">—</span>';
+    const formatted = formatter ? formatter(v) : v;
+    return formatted;
+  }
+
+  // Gera uma linha de tabela comparativa para métricas com campos: atual, trimestre_anterior, var_trimestre_pct, mesmo_trim_ano_ant, var_anual_pct
+  function compRow(label, obj, formatter, varSuffix='%') {
+    if (!obj) obj = {};
+    return `<tr>
+      <td class="row-label">${label}</td>
+      <td>${cellVal(obj.atual, formatter)}</td>
+      <td>${cellVal(obj.trimestre_anterior, formatter)}</td>
+      <td>${fmtVar(obj.var_trimestre_pct, varSuffix)}</td>
+      <td>${cellVal(obj.mesmo_trim_ano_ant, formatter)}</td>
+      <td>${fmtVar(obj.var_anual_pct, varSuffix)}</td>
+    </tr>`;
+  }
+
+  // Tabela com colunas de acumulado
+  function compRowFull(label, obj, formatter, varSuffix='%') {
+    if (!obj) obj = {};
+    return `<tr>
+      <td class="row-label">${label}</td>
+      <td>${cellVal(obj.atual, formatter)}</td>
+      <td>${cellVal(obj.trimestre_anterior, formatter)}</td>
+      <td>${fmtVar(obj.var_trimestre_pct, varSuffix)}</td>
+      <td>${cellVal(obj.mesmo_trim_ano_ant, formatter)}</td>
+      <td>${fmtVar(obj.var_anual_pct, varSuffix)}</td>
+      <td>${cellVal(obj.acumulado_atual, formatter)}</td>
+      <td>${cellVal(obj.acumulado_ano_ant, formatter)}</td>
+      <td>${obj.var_acumulado_pct != null ? fmtVar(obj.var_acumulado_pct, varSuffix) : '<span class="var-neutral">—</span>'}</td>
+    </tr>`;
+  }
+
+  // Linha simples para margens (usa p.p. ao invés de %)
+  function marginRow(label, obj) {
+    if (!obj) obj = {};
+    return `<tr>
+      <td class="row-label">${label}</td>
+      <td>${fmtPct(obj.atual)}</td>
+      <td>${fmtPct(obj.trimestre_anterior)}</td>
+      <td>${fmtVar(obj.var_trimestre_pp, ' p.p.')}</td>
+      <td>${fmtPct(obj.mesmo_trim_ano_ant)}</td>
+      <td>${fmtVar(obj.var_anual_pp, ' p.p.')}</td>
+    </tr>`;
+  }
+
+  function row(k, v, suf='') {
+    const display = v != null ? `<span class="field-val">${v}${suf}</span>` : `<span class="field-val null">—</span>`;
+    return `<div class="field-row"><span class="field-key">${k}</span>${display}</div>`;
+  }
+
+  function kpiCard(icon, label, value, sub) {
+    const display = value ?? '<span style="color:var(--muted);font-size:1rem;">—</span>';
+    return `
+      <div class="card kpi">
+        <div class="card-title">${icon} ${label}</div>
+        <div class="kpi-val">${display}</div>
+        ${sub ? `<div class="kpi-sub">${sub}</div>` : ''}
+      </div>
+    `;
+  }
+
   // ── Render result ────────────────────────────────
   function renderResult(data) {
     const d = data.dados || {};
-    const emp   = d.empresa      || {};
-    const fin   = d.financeiro   || {};
-    const op    = d.operacional  || {};
-    const idx   = d.indices      || {};
-    const meta  = d.metadata     || {};
-    const emps  = d.empreendimentos || [];
-    const em    = data.extraction_meta || {};
-    const tu    = data.token_usage || {};
-
-    const fmt  = (v, prefix='R$ ', suffix='') => v != null ? `${prefix}${formatNum(v)}${suffix}` : null;
-    const fmtP = v => v != null ? `${v.toFixed(1)}%` : null;
-    const row  = (k, v, suf='') => {
-      const display = v != null ? `<span class="field-val">${v}${suf}</span>` : `<span class="field-val null">—</span>`;
-      return `<div class="field-row"><span class="field-key">${k}</span>${display}</div>`;
-    };
+    const emp  = d.empresa     || {};
+    const per  = d.periodo     || {};
+    const fin  = d.financeiro  || {};
+    const op   = d.operacional || {};
+    const idx  = d.indices     || {};
+    const gui  = d.guidance    || {};
+    const meta = d.metadata    || {};
+    const em   = data.extraction_meta || {};
+    const tu   = data.token_usage || {};
 
     const confidence = meta.confianca_extracao ?? 0;
     const confColor  = confidence > 0.7 ? 'var(--green)' : confidence > 0.4 ? 'var(--accent)' : 'var(--red)';
 
+    const getAtual = (obj) => obj ? obj.atual : null;
+
+    // Variação trimestral para os KPIs de destaque
+    const kpiSub = (obj, suffix='%') => {
+      if (!obj || obj.var_trimestre_pct == null) return '';
+      const v = obj.var_trimestre_pct;
+      const sign = v >= 0 ? '+' : '';
+      const cls = v >= 0 ? 'var-positive' : 'var-negative';
+      return `<span class="${cls}">${sign}${v.toFixed(1)}${suffix} vs trim. ant.</span>`;
+    };
+
     document.getElementById('mainContent').innerHTML = `
-      <!-- Header -->
+      <!-- ═══════ HEADER ═══════ -->
       <div class="result-header">
         <div class="result-title">
           <h1>${emp.nome || data.filename || 'Construtora'}</h1>
           <p>
-            ${meta.tipo_documento || 'Documento'} ·
-            ${fin.periodo_referencia || '—'} ·
-            ${em.total_pages || '?'} páginas analisadas ·
-            ${emps.length} empreendimento(s)
+            ${emp.ticker ? `<strong>${emp.ticker}</strong> · ` : ''}
+            ${meta.tipo_documento || 'Documento'} · 
+            Trimestre: <strong>${per.trimestre_atual || '—'}</strong>
+            ${per.acumulado_atual ? ` · Acumulado: <strong>${per.acumulado_atual}</strong>` : ''}
           </p>
         </div>
         <div class="confidence-badge">
@@ -592,95 +700,213 @@
         </div>
       </div>
 
-      <!-- KPIs financeiros -->
+      <!-- ═══════ KPIs FINANCEIROS ═══════ -->
       <div class="grid-4">
-        ${kpiCard('💰', 'Receita Bruta', fmt(fin.receita_bruta))}
-        ${kpiCard('📈', 'EBITDA', fmt(fin.ebitda))}
-        ${kpiCard('💵', 'Lucro Líquido', fmt(fin.lucro_liquido))}
-        ${kpiCard('🏦', 'Dívida Líquida', fmt(fin.divida_liquida))}
+        ${kpiCard('💰', 'Receita Líquida', fmtMoney(getAtual(fin.receita_liquida)), kpiSub(fin.receita_liquida))}
+        ${kpiCard('📊', 'Lucro Bruto Aj.', fmtMoney(getAtual(fin.lucro_bruto_ajustado)), kpiSub(fin.lucro_bruto_ajustado))}
+        ${kpiCard('📈', 'EBITDA Aj.', fmtMoney(getAtual(fin.ebitda_ajustado)), kpiSub(fin.ebitda_ajustado))}
+        ${kpiCard('💵', 'Lucro Líquido', fmtMoney(getAtual(fin.lucro_liquido)), kpiSub(fin.lucro_liquido))}
       </div>
 
-      <!-- Operacional KPIs -->
       <div class="grid-4">
-        ${kpiCard('🏘️', 'Unid. Lançadas', op.unidades_lancadas, '')}
-        ${kpiCard('🤝', 'Unid. Vendidas', op.unidades_vendidas, '')}
-        ${kpiCard('🔥', 'VSO', fmtP(op.vso_percentual), '')}
-        ${kpiCard('📦', 'VGV Lançado', fmt(op.vgv_lancado))}
+        ${kpiCard('🏦', 'Dívida Líquida', fmtMoney(fin.divida_liquida))}
+        ${kpiCard('💳', 'Caixa Total', fmtMoney(fin.caixa_total))}
+        ${kpiCard('📉', 'Díz. Líq./PL', fmtPct(fin.divida_liquida_pl_pct))}
+        ${kpiCard('🏢', 'Díz. Líq. Corp./PL', fmtPct(fin.divida_liquida_corporativa_pl_pct))}
       </div>
 
-      <!-- Detalhes -->
+      <!-- ═══════ TABELA COMPARATIVA FINANCEIRA ═══════ -->
+      <div class="card" style="margin-bottom:16px; overflow-x:auto;">
+        <div class="card-title">💹 Demonstrativo Financeiro Comparativo</div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Indicador</th>
+              <th>${per.trimestre_atual || 'Atual'}</th>
+              <th>${per.trimestre_anterior || 'Trim. Ant.'}</th>
+              <th>Var. Trim.</th>
+              <th>${per.mesmo_trimestre_ano_anterior || 'Ano Ant.'}</th>
+              <th>Var. Anual</th>
+              <th>${per.acumulado_atual || 'Acum. Atual'}</th>
+              <th>${per.acumulado_ano_anterior || 'Acum. Ant.'}</th>
+              <th>Var. Acum.</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${compRowFull('Receita Líquida', fin.receita_liquida, fmtMoney)}
+            ${compRowFull('Lucro Bruto Ajustado', fin.lucro_bruto_ajustado, fmtMoney)}
+            ${compRowFull('Lucro Líquido', fin.lucro_liquido, fmtMoney)}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ═══════ TABELA MARGENS E EBITDA ═══════ -->
+      <div class="card" style="margin-bottom:16px; overflow-x:auto;">
+        <div class="card-title">📐 Margens e EBITDA</div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Indicador</th>
+              <th>${per.trimestre_atual || 'Atual'}</th>
+              <th>${per.trimestre_anterior || 'Trim. Ant.'}</th>
+              <th>Var. Trim.</th>
+              <th>${per.mesmo_trimestre_ano_anterior || 'Ano Ant.'}</th>
+              <th>Var. Anual</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${marginRow('Margem Bruta Aj. (%)', fin.margem_bruta_ajustada_pct)}
+            ${compRow('EBITDA Ajustado', fin.ebitda_ajustado, fmtMoney)}
+            ${marginRow('Margem EBITDA Aj. (%)', fin.margem_ebitda_ajustada_pct)}
+            ${marginRow('Margem Líquida (%)', fin.margem_liquida_pct)}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ═══════ KPIs OPERACIONAIS ═══════ -->
+      <div class="grid-4">
+        ${kpiCard('📦', 'Lançamentos VGV', fmtMoney(getAtual(op.lancamentos_vgv)), kpiSub(op.lancamentos_vgv))}
+        ${kpiCard('🤝', 'Vendas Líquidas VGV', fmtMoney(getAtual(op.vendas_liquidas_vgv)), kpiSub(op.vendas_liquidas_vgv))}
+        ${kpiCard('🔥', 'VSO Líquida', fmtPct(getAtual(op.vso_liquida_pct)))}
+        ${kpiCard('🗺️', 'Banco de Terrenos', fmtMoney(op.banco_terrenos_vgv))}
+      </div>
+
+      <div class="grid-3">
+        ${kpiCard('🏠', 'Preço Médio / Unidade', op.preco_medio_por_unidade_mil != null ? `R$ ${op.preco_medio_por_unidade_mil.toLocaleString('pt-BR')} mil` : null)}
+        ${kpiCard('📋', 'VGV Repassado', fmtMoney(getAtual(op.vgv_repassado)), kpiSub(op.vgv_repassado))}
+        ${kpiCard('🏗️', 'Unidades Entregues', op.unidades_entregues ? cellVal(getAtual(op.unidades_entregues), v => v.toLocaleString('pt-BR')) : null)}
+      </div>
+
+      <!-- ═══════ TABELA COMPARATIVA OPERACIONAL ═══════ -->
+      <div class="card" style="margin-bottom:16px; overflow-x:auto;">
+        <div class="card-title">🔧 Operacional Comparativo</div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Indicador</th>
+              <th>${per.trimestre_atual || 'Atual'}</th>
+              <th>${per.trimestre_anterior || 'Trim. Ant.'}</th>
+              <th>Var. Trim.</th>
+              <th>${per.mesmo_trimestre_ano_anterior || 'Ano Ant.'}</th>
+              <th>Var. Anual</th>
+              <th>${per.acumulado_atual || 'Acum. Atual'}</th>
+              <th>${per.acumulado_ano_anterior || 'Acum. Ant.'}</th>
+              <th>—</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${compRowFull('Lançamentos VGV', op.lancamentos_vgv, fmtMoney)}
+            ${compRowFull('Vendas Líquidas VGV', op.vendas_liquidas_vgv, fmtMoney)}
+            <tr>
+              <td class="row-label">VSO Líquida (%)</td>
+              <td>${fmtPct(op.vso_liquida_pct?.atual)}</td>
+              <td>${fmtPct(op.vso_liquida_pct?.trimestre_anterior)}</td>
+              <td>${fmtVar(op.vso_liquida_pct?.var_trimestre_pp, ' p.p.')}</td>
+              <td>${fmtPct(op.vso_liquida_pct?.mesmo_trim_ano_ant)}</td>
+              <td>${fmtVar(op.vso_liquida_pct?.var_anual_pp, ' p.p.')}</td>
+              <td colspan="3"></td>
+            </tr>
+            ${compRow('VGV Repassado', op.vgv_repassado, fmtMoney)}
+            <tr>
+              <td class="row-label">Unidades Entregues</td>
+              <td>${cellVal(op.unidades_entregues?.atual, v => v.toLocaleString('pt-BR'))}</td>
+              <td>${cellVal(op.unidades_entregues?.trimestre_anterior, v => v.toLocaleString('pt-BR'))}</td>
+              <td>—</td>
+              <td>${cellVal(op.unidades_entregues?.mesmo_trim_ano_ant, v => v.toLocaleString('pt-BR'))}</td>
+              <td>—</td>
+              <td colspan="3"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- ═══════ DETALHES: EMPRESA + ÍNDICES ═══════ -->
       <div class="grid-2">
-        <!-- Empresa -->
         <div class="card">
-          <div class="card-title">🏢 Dados da Empresa</div>
+          <div class="card-title">🏢 Dados da Empresa & Período</div>
           <div class="field-list">
+            ${row('Nome', emp.nome)}
             ${row('CNPJ', emp.cnpj)}
-            ${row('Endereço', emp.endereco)}
-            ${row('Telefone', emp.telefone)}
-            ${row('Fundação', emp.ano_fundacao)}
-            ${row('Site', emp.site)}
-            ${row('Estados', op.estados_atuacao?.join(', ') || null)}
-            ${row('Empreend. Ativos', op.num_empreendimentos_ativos)}
+            ${row('Ticker', emp.ticker)}
+            ${row('Segmento', emp.segmento)}
+            ${row('Site RI', emp.site_ri)}
+            <div style="border-top:1px solid var(--border); margin:8px 0;"></div>
+            ${row('Trimestre Atual', per.trimestre_atual)}
+            ${row('Trimestre Anterior', per.trimestre_anterior)}
+            ${row('Mesmo Trim. Ano Ant.', per.mesmo_trimestre_ano_anterior)}
+            ${row('Acumulado Atual', per.acumulado_atual)}
+            ${row('Acumulado Ano Ant.', per.acumulado_ano_anterior)}
           </div>
         </div>
 
-        <!-- Índices -->
         <div class="card">
-          <div class="card-title">📊 Índices Financeiros</div>
+          <div class="card-title">📊 Índices</div>
           <div class="field-list">
-            ${row('ROE', fmtP(idx.roe_percentual))}
-            ${row('Margem Bruta', fmtP(idx.margem_bruta_percentual))}
-            ${row('Margem Líquida', fmtP(idx.margem_liquida_percentual))}
-            ${row('Alavancagem', fmtP(idx.alavancagem_percentual))}
+            ${row('ROE', fmtPct(idx.roe_pct))}
+            ${row('ROCE', fmtPct(idx.roce_pct))}
+            ${row('Margem REF', fmtPct(idx.margem_ref_pct))}
           </div>
-          ${idx.margem_bruta_percentual != null ? `
+          ${getAtual(fin.margem_bruta_ajustada_pct) != null ? `
             <div style="margin-top:16px;">
-              <div class="field-key" style="margin-bottom:6px;">Margem Bruta</div>
+              <div class="field-key" style="margin-bottom:6px;">Margem Bruta Ajustada (Atual)</div>
               <div class="progress-wrap">
-                <div class="progress-bar"><div class="progress-fill" style="width:${Math.min(idx.margem_bruta_percentual,100)}%"></div></div>
-                <span style="font-size:0.75rem; font-weight:700; color:var(--accent);">${idx.margem_bruta_percentual.toFixed(1)}%</span>
+                <div class="progress-bar"><div class="progress-fill" style="width:${Math.min(getAtual(fin.margem_bruta_ajustada_pct),100)}%"></div></div>
+                <span style="font-size:0.75rem; font-weight:700; color:var(--accent);">${getAtual(fin.margem_bruta_ajustada_pct).toFixed(1)}%</span>
+              </div>
+            </div>
+          ` : ''}
+          ${getAtual(fin.margem_ebitda_ajustada_pct) != null ? `
+            <div style="margin-top:12px;">
+              <div class="field-key" style="margin-bottom:6px;">Margem EBITDA Ajustada (Atual)</div>
+              <div class="progress-wrap">
+                <div class="progress-bar"><div class="progress-fill" style="width:${Math.min(getAtual(fin.margem_ebitda_ajustada_pct),100)}%; background:var(--accent-2);"></div></div>
+                <span style="font-size:0.75rem; font-weight:700; color:var(--accent-2);">${getAtual(fin.margem_ebitda_ajustada_pct).toFixed(1)}%</span>
+              </div>
+            </div>
+          ` : ''}
+          ${fin.margem_liquida_pct && getAtual(fin.margem_liquida_pct) != null ? `
+            <div style="margin-top:12px;">
+              <div class="field-key" style="margin-bottom:6px;">Margem Líquida (Atual)</div>
+              <div class="progress-wrap">
+                <div class="progress-bar"><div class="progress-fill" style="width:${Math.min(getAtual(fin.margem_liquida_pct),100)}%; background:var(--green);"></div></div>
+                <span style="font-size:0.75rem; font-weight:700; color:var(--green);">${getAtual(fin.margem_liquida_pct).toFixed(1)}%</span>
               </div>
             </div>
           ` : ''}
         </div>
       </div>
 
-      <!-- Empreendimentos -->
-      ${emps.length > 0 ? `
+      <!-- ═══════ GUIDANCE ═══════ -->
+      ${gui && Object.keys(gui).some(k => gui[k] != null) ? `
         <div class="card" style="margin-bottom:16px;">
-          <div class="card-title">🏗️ Empreendimentos (${emps.length})</div>
-          <table class="empreendimentos-table">
-            <thead>
-              <tr>
-                <th>Nome</th>
-                <th>Localização</th>
-                <th>Segmento</th>
-                <th>Fase</th>
-                <th>Unidades</th>
-                <th>VGV Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${emps.map(e => `
-                <tr>
-                  <td style="font-weight:600;">${e.nome || '—'}</td>
-                  <td>${[e.cidade, e.estado].filter(Boolean).join(' / ') || '—'}</td>
-                  <td>${e.segmento || '—'}</td>
-                  <td>${phaseTag(e.fase)}</td>
-                  <td style="font-family:var(--font-mono);">${e.unidades_total ?? '—'}</td>
-                  <td style="font-family:var(--font-mono);">${e.vgv_total ? 'R$ ' + formatNum(e.vgv_total) : '—'}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
+          <div class="card-title">🎯 Guidance (Projeções)</div>
+          <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 12px;">
+            <div class="field-list">
+              <div class="field-key" style="margin-bottom: 8px; font-weight:700;">Vendas Líquidas</div>
+              ${row('Mínimo', fmtMoney(gui.vendas_liquidas_min))}
+              ${row('Máximo', fmtMoney(gui.vendas_liquidas_max))}
+            </div>
+            <div class="field-list">
+              <div class="field-key" style="margin-bottom: 8px; font-weight:700;">Margem Bruta (%)</div>
+              ${row('Mínimo', fmtPct(gui.margem_bruta_min_pct))}
+              ${row('Máximo', fmtPct(gui.margem_bruta_max_pct))}
+            </div>
+            <div class="field-list">
+              <div class="field-key" style="margin-bottom: 8px; font-weight:700;">EBITDA</div>
+              ${row('Mínimo', fmtMoney(gui.ebitda_min))}
+              ${row('Máximo', fmtMoney(gui.ebitda_max))}
+            </div>
+          </div>
         </div>
       ` : ''}
 
-      <!-- Meta + tokens -->
+      <!-- ═══════ META + TOKENS ═══════ -->
       <div class="grid-2">
         <div class="card">
-          <div class="card-title">ℹ️ Extração</div>
+          <div class="card-title">ℹ️ Metadata & Extração</div>
           <div class="field-list">
+            ${row('Tipo Documento', meta.tipo_documento)}
+            ${row('Confiança', fmtPct(confidence * 100))}
             ${row('Páginas totais', em.total_pages)}
             ${row('Páginas analisadas', em.pages_processed)}
             ${row('Tabelas detectadas', em.tables_found)}
@@ -694,7 +920,7 @@
               </div>
             </div>
           ` : ''}
-          ${meta.observacoes ? `<div style="margin-top:12px; font-size:0.75rem; color:var(--muted); line-height:1.5;">${meta.observacoes}</div>` : ''}
+          ${meta.observacoes ? `<div style="margin-top:12px; font-size:0.75rem; color:var(--muted); line-height:1.5; border-top:1px solid var(--border); padding-top:10px;">💬 ${meta.observacoes}</div>` : ''}
         </div>
 
         <div class="card">
@@ -711,33 +937,6 @@
         </div>
       </div>
     `;
-  }
-
-  function kpiCard(icon, label, value, raw) {
-    const display = value ?? '<span style="color:var(--muted);font-size:1rem;">—</span>';
-    return `
-      <div class="card kpi">
-        <div class="card-title">${icon} ${label}</div>
-        <div class="kpi-val">${display}</div>
-      </div>
-    `;
-  }
-
-  function phaseTag(fase) {
-    if (!fase) return '—';
-    const cls = fase.toLowerCase().includes('lanç') ? 'phase-lancamento'
-              : fase.toLowerCase().includes('obr')  ? 'phase-obras'
-              : fase.toLowerCase().includes('entr') ? 'phase-entregue'
-              : '';
-    return `<span class="phase-tag ${cls}">${fase}</span>`;
-  }
-
-  function formatNum(n) {
-    if (n == null) return '—';
-    if (n >= 1e9) return (n/1e9).toFixed(2) + ' B';
-    if (n >= 1e6) return (n/1e6).toFixed(2) + ' M';
-    if (n >= 1e3) return (n/1e3).toFixed(1) + ' K';
-    return n.toLocaleString('pt-BR');
   }
 
   // ── Token tracker ────────────────────────────────
@@ -769,7 +968,6 @@
     document.getElementById('loadingSub').textContent  = sub;
   }
   function hideLoading() { document.getElementById('loadingOverlay').classList.remove('show'); }
-
   let toastTimer;
   function showToast(msg, type='') {
     const el = document.getElementById('toast');

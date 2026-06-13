@@ -11,14 +11,14 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 
-for _p in [
-    Path(__file__).resolve().parent.parent / ".env",
-    Path(__file__).resolve().parent / ".env",
-    Path("/app/.env"),
-]:
-    if _p.exists():
-        load_dotenv(dotenv_path=_p, override=False)
-        break
+# for _p in [
+#     Path(__file__).resolve().parent.parent / ".env",
+#     Path(__file__).resolve().parent / ".env",
+#     Path("/app/.env"),
+# ]:
+#     if _p.exists():
+#         load_dotenv(dotenv_path=_p, override=False)
+#         break
 
 MINIO_ENDPOINT  = os.getenv("MINIO_ENDPOINT",  "localhost:9000")
 MINIO_ACCESS    = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
